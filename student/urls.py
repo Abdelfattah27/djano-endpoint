@@ -1,7 +1,10 @@
 from xml.etree.ElementInclude import include
 from django.urls import path 
-from .views import read_create , update_delete
+from .views import CRUDStudents , CRUDStudent
+from django.views.generic import TemplateView
+
 urlpatterns = [
-    path("" , read_create ) , 
-    path("<int:id>" , update_delete)
+    path("" , CRUDStudents.as_view() ) , 
+    path("<int:id>" , CRUDStudent.as_view())
+   # path("<int:id>" , update_delete)
 ]

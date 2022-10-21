@@ -1,49 +1,46 @@
+from ast import Delete
+import email
 from django.shortcuts import HttpResponse, render 
 import json
 from django.http import JsonResponse
+from django.views import View
+from django.core import serializers
+from .models import Student
 
-def read_create(request) :
-    try :
-        f = open("student\students.json")
-        data = json.load(f)
-        f.close()
-        if request.method == "GET" : 
-            return JsonResponse(data , safe=False)
-        elif request.method == "POST" : 
-            data.append(json.loads(request.body))
-            with open("student\students.json", "w") as outfile:
-                json.dump(data, outfile)
-            return JsonResponse({"status" : "Added successfully"})
-    except Exception as e:
-        return JsonResponse({"status" : str(e)})
-
-def update_delete(request , id) :
-    try :
-        founded = False 
-        f = open("student\students.json")
-        data = json.load(f)
-        f.close() 
-        for i in range(0 , len(data)) : 
-            print(data[i])
-            if data[i]["id"] == id : 
-                founded = True 
-                if request.method == "PUT" : 
-                    data[i] = json.loads(request.body)
-                    with open("student\students.json", "w") as outfile:
-                        json.dump(data, outfile)
-                    return JsonResponse({"status" : "Updated successfully"})
-                elif request.method == "DELETE" : 
-                    del data[i]
-                    with open("student\students.json", "w") as outfile:
-                        json.dump(data, outfile)
-                    return JsonResponse({"status" : "Deleted successfully"})
-                else : 
-                    return JsonResponse({"status" : "bad request method"})
-
-                break 
-        if not founded : 
-             return JsonResponse({"status" : "Not found"})
-    except Exception as e:
-        return JsonResponse({"Message" : str(e)}) 
-
-
+class CRUDStudents(View) : 
+    def get(self , request ) : 
+        try :
+            students =json.loads(serializers.serialize("json" , Student.objects.filter()))
+            return JsonResponse(students , safe=False)
+        except Exception as ex : 
+            return JsonResponse({"status" : str(ex)})
+    def post(self , request)  :
+        try : 
+            for i in json.loads(request.body) : 
+                Student.objects.create(first_name = i["first_name"] , last_name = i["last_name"] , email = i["email"] , age = i["age"] , class_name = i["class_name"])
+            return JsonResponse({"status " : "Added Successfully"})
+        except Exception as ex : 
+            return JsonResponse({"status" : str(ex)})
+            
+class CRUDStudent(View) : 
+    def get(self , request , id) : 
+        try : 
+            student = Student.objects.get(id = id) 
+            serialized_student = serializers.serialize("json" , [student , ])
+            return JsonResponse(json.loads(serialized_student) , safe=False)
+        except Exception as ex  : 
+            return JsonResponse({"status" : str(ex)})
+    def put(self , request , id) : 
+        try : 
+            updated_student = json.loads(request.body)
+            student = Student.objects.filter(id = id).update(first_name = updated_student["first_name"] , last_name = updated_student["last_name"] , email = updated_student["email"] , age = updated_student["age"] , class_name =updated_student["class_name"])
+            return JsonResponse({"status" : "updated successfully"})
+        except Exception as ex  : 
+            return JsonResponse({"status" : str(ex)})
+    def delete(self , request , id) : 
+        try : 
+            Student.objects.get(id = id).delete() 
+            return JsonResponse({"status" : "Deleted Successfully"})
+        except Exception as ex  : 
+            return JsonResponse({"status" : str(ex)})
+     
