@@ -1,14 +1,26 @@
-from xml.etree.ElementInclude import include
-from django.urls import path 
-from .views import CRUDStudents , CRUDStudent , CRUDParent , CRUDParents  , CRUDSubject , CRUDSubjects
-from django.views.generic import TemplateView
+from django.urls import path  , include
+from .views import StudentView  , StudentDetailView , ParentView , ParentDetailView, SubjectView , SubjectDetailView
+#,  CRUDStudents , CRUDStudent , CRUDParent , CRUDParents  , CRUDSubject , CRUDSubjects
 
 urlpatterns = [
-    path("student/" , CRUDStudents.as_view() ) , 
-    path("student/<int:id>" , CRUDStudent.as_view()),
-    path("parent/" , CRUDParents.as_view() ) , 
-    path("parent/<int:id>" , CRUDParent.as_view()),
-    path("subject/" , CRUDSubjects.as_view() ) , 
-    path("subject/<int:id>" , CRUDSubject.as_view())
-   # path("<int:id>" , update_delete)
+    path("student/" , include(
+        [
+            path("" , StudentView.as_view()) , 
+            path("<int:id>" , StudentDetailView.as_view())
+        ]
+    ) )  ,
+    path("parent/" , include(
+        [
+            path("" , ParentView.as_view()) , 
+            path("<int:pk>" , ParentDetailView.as_view())
+        ]
+    ) )  ,
+    path("subject/" , include(
+        [
+           path("" , SubjectView.as_view())  ,
+            path("<int:pk>" , SubjectDetailView.as_view())
+        ]
+    ) )
+
 ]
+ 
