@@ -48,7 +48,7 @@ class StudentDetailView(APIView):
         	return Response(status.HTTP_404_NOT_FOUND)
 
 
-class ParentView(generics.GenericAPIView, mixins.CreateModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin  ) :
+class ParentView(generics.GenericAPIView, mixins.CreateModelMixin, mixins.ListModelMixin  ) :
     queryset = Parent.objects.all()
     serializer_class = ParentSerializer 
     def get(self, request, *args, **kwargs):
