@@ -1,79 +1,160 @@
 from django.shortcuts import render 
-from .models import Student , Parent, Subject
+from .models import Student , Parent, StudentActiveUsers , ParentActiveUsers
 from rest_framework import status
-
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import mixins
-from rest_framework import generics
-from .serializers import ParentSerializer, StudentSerializer, SubjectSerializer
-
+from rest_framework import mixins , generics
+from .serializers import ParentSerializer, StudentSerializer , LoginSerializer
+from .middlewares import ParentAuthentication, ParentDataPermissions, RegisterAuthentication ,StudentAuthentication , StudentDataPermissions , ListOfDataAuthentication
 import json
-def without_keys(d, keys):
-    return {x: d[x] for x in d if x not in keys}
-
-class StudentView(APIView) : 
-    def get(self , request) : 
-
-        data = StudentSerializer(Student.objects.all() , many = True)
-        return Response(data.data)
-
-    def post(self , request) : 
-        data = request.data
-        serializer = StudentSerializer(data = data) 
-        if serializer.is_valid() : 
-            serializer.save() 
-            return Response(serializer.data) 
-        else : 
-             return Response(serializer.errors)
-class StudentDetailView(APIView): 
-    def get(self , request , id) : 
-        try : 
-            data = StudentSerializer(Student.objects.get(id = id))
-            return Response(data.data)
-        except Student.DoesNotExist :
-            return Response(status.HTTP_404_NOT_FOUND)
-    def put(self, request, id) : 
-        serializer = StudentSerializer(data=request.data, instance=Student.objects.get(id=id))
-        if serializer.is_valid() : 
-            serializer.save() 
-            return Response(serializer.data) 
-        else : 
-            return Response(serializer.errors)  
-    def delete(self, request, id): # no need for REST framework, endpoint GUT will have a DELETE button
-        try: # use it to avoid get errors
-            Student.objects.get(id=id).delete()
-            return Response(status=status.HTTP_200_OK)
-        except Student.DoesNotExist:
-        	return Response(status.HTTP_404_NOT_FOUND)
+import jwt
+from datetime import datetime
+from django.core import serializers
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 
-class ParentView(generics.GenericAPIView, mixins.CreateModelMixin, mixins.ListModelMixin  ) :
-    queryset = Parent.objects.all()
-    serializer_class = ParentSerializer 
-    def get(self, request, *args, **kwargs):
-    	return self.list(request, *args, **kwargs)  
-    def post(self, request, *args, **kwargs):
-        return self.create(request, *args, **kwargs)
-      
-
-class ParentDetailView(generics.GenericAPIView, mixins.CreateModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin  ) :
-    queryset = Parent.objects.all()
-    serializer_class = ParentSerializer 
-    def put(self, request, *args, **kwargs):
-	    return self.update(request, *args, **kwargs) 
-    def delete(self, request, *args, **kwargs):
-        return self.delete(request, *args, **kwargs)
-    def get(self, request, *args, **kwargs):
-    	return self.retrieve(request, *args, **kwargs)
+class ParentLogin(generics.GenericAPIView) : 
     
-class SubjectDetailView(generics.DestroyAPIView,
-				generics.UpdateAPIView,
-				generics.RetrieveAPIView # needs id
-				):
-	queryset = Subject.objects.all()
-	serializer_class = SubjectSerializer
-class SubjectView(generics.ListCreateAPIView) :
-    queryset = Subject.objects.all()
-    serializer_class = SubjectSerializer
+    queryset = Parent.objects.all()
+    serializer_class = LoginSerializer
+    @swagger_auto_schema(
+	operation_summary='Login as parent',
+	operation_description="""
+	**send request with email and password**
+	you will get authentication key that will used in header of any coming request use header name as **Authorization** """, 
+	responses={400:'not-found',
+	403: 'unprocessable entity'},
+	)
+    def post(self, request, *args, **kwargs):
+        try : 
+            user = Parent.objects.filter(Q(email=request.data["email"])&Q(password=request.data["password"])) 
+            if len(user) > 0 : 
+                now = datetime.now().strftime("%d/%m/%Y%H:%M:%S")
+                request.data["dateTime"] = now 
+                encoded_jwt = jwt.encode(request.data , "secret", algorithm="HS256")
+                ParentActiveUsers.objects.create(authenticationKey = encoded_jwt , user = user[0] )
+                return Response({"your authentication key is save it" : encoded_jwt})
 
+            else : 
+                return Response({"Message" : "Wrong password or email"}) 
+        except Exception as ex : 
+            return Response({"Message" : str(ex)})
+ 
+        
+class ParentRegister(generics.GenericAPIView, mixins.CreateModelMixin ) :
+    authentication_classes = [RegisterAuthentication]
+    queryset = Parent.objects.all()
+    serializer_class = ParentSerializer
+    @swagger_auto_schema(
+	operation_summary='Register as parent',
+	operation_description="""
+	**send request with parent data**
+	that will create a new parent ad store it in the database """, 
+	responses={400:'not-found',
+	403: 'unprocessable entity'},
+	)
+    def post(self, request, *args, **kwargs):
+        try : 
+            return self.create(request, *args, **kwargs)
+        except Exception as ex : 
+            return Response({"Message" : str(ex)})
+
+class ParentDetailView(generics.DestroyAPIView,generics.UpdateAPIView,generics.RetrieveAPIView) :
+    authentication_classes = [ParentAuthentication]
+    permission_classes = [ParentDataPermissions]
+    queryset = Parent.objects.all()
+    serializer_class = ParentSerializer
+    
+class ParentView (generics.GenericAPIView) :
+    authentication_classes = [ListOfDataAuthentication , StudentAuthentication]
+    serializer_class = ParentSerializer
+    queryset = Parent.objects.all()
+    @swagger_auto_schema(
+	operation_summary='Get data of student\'s parent',
+	operation_description="""
+	**send request that will read the parent of login student **
+	that will retrieve the data of related parent data to student account which you are logged in  """, 
+	responses={400:'not-found',
+	403: 'unprocessable entity'},
+	)
+    def get (self , response , *args, **kwargs) : 
+        try : 
+            student = StudentActiveUsers.objects.get(authenticationKey = response.headers["Authorization"]).user
+            parent_data = student.parent
+            delattr (parent_data, "password")  
+            parent_data = json.loads(serializers.serialize("json" , [parent_data , ]))
+            return Response(parent_data[0])
+        except Exception as ex : 
+            return Response({"Message" : f" you are not Authenticated {str(ex)}"})
+
+class StudentsView (generics.GenericAPIView) :
+    authentication_classes = [ListOfDataAuthentication , ParentAuthentication]
+    serializer_class = StudentSerializer
+    queryset = Student.objects.all()
+    @swagger_auto_schema(
+	operation_summary='Get data of parent\'s children',
+	operation_description="""
+	**send request that will read the children of login parent **
+	that will retrieve the data of related children data to parent account which you are logged in  """, 
+	responses={400:'not-found',
+	403: 'unprocessable entity'},
+	)
+    def get (self , response , *args, **kwargs) : 
+        try : 
+            parent = ParentActiveUsers.objects.get(authenticationKey = response.headers["Authorization"]).user
+            students_data = parent.children.all()
+            parent_data = json.loads(serializers.serialize("json" , students_data))
+            return Response(parent_data)
+        except Exception as ex : 
+            return Response({"Message" : "you are't have any children to view"})
+
+
+class StudentLogin(generics.GenericAPIView) : 
+    queryset = Student.objects.all()
+    serializer_class = LoginSerializer
+    @swagger_auto_schema(
+	operation_summary='Login as Student',
+	operation_description="""
+	**send request with email and password**
+	you will get authentication key that will used in header of any coming request use header name as **Authorization** """, 
+	responses={400:'not-found',
+	403: 'unprocessable entity'},
+	)
+    def post(self, request, *args, **kwargs):
+        user = Student.objects.filter(Q(email=request.data["email"])&Q(password=request.data["password"])) 
+        if len(user) > 0 : 
+            now = datetime.now().strftime("%d/%m/%Y%H:%M:%S")
+            request.data["dateTime"] = now 
+            encoded_jwt = jwt.encode(request.data , "secret", algorithm="HS256")
+            StudentActiveUsers.objects.create(authenticationKey = encoded_jwt , user = user[0] )
+            return Response({"your authentication key is save it" : encoded_jwt})
+        else  : 
+            return Response({"Message" : "Wrong password or email"}) 
+ 
+        
+class StudentRegister(generics.GenericAPIView, mixins.CreateModelMixin ) :
+   
+        authentication_classes = [RegisterAuthentication]
+        queryset = Parent.objects.all()
+        serializer_class = StudentSerializer
+        @swagger_auto_schema(
+	    operation_summary='Register as student',
+	    operation_description="""
+	    **send request with student data**
+	    that will create a new student ad store it in the database """, 
+	    responses={400:'not-found',
+	    403: 'unprocessable entity'},
+	    )
+        def post(self, request, *args, **kwargs):
+            try : 
+                return self.create(request, *args, **kwargs)
+            except Exception as ex : 
+                return Response({"status" : f"Wrong data as {str(ex)}"}) 
+    
+class StudentDetailView(generics.DestroyAPIView,generics.UpdateAPIView,generics.RetrieveAPIView) :
+    authentication_classes = [StudentAuthentication]
+    permission_classes = [StudentDataPermissions]
+    queryset = Student.objects.all()
+    serializer_class = StudentSerializer

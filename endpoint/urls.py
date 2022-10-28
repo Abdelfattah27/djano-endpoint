@@ -21,11 +21,11 @@ from drf_yasg import openapi
 
 schema_view = get_schema_view(
    openapi.Info(
-      title="Snippets API",
+      title="Task6 API",
       default_version='v1',
-      description="Test description",
-      terms_of_service="https://www.google.com/policies/terms/",
-      contact=openapi.Contact(email="contact@snippets.local"),
+      description="two end points parent and student used the authentication and permissions, it an application of what we learned in authentications and permissions,  first for go to our system we should register as student or parent in /register/ end point with post request then we can login with the email and password we have registered, after login th authentication key will get back to you then you must save it in headers of any request you will call in headers with name 'Authorization' then you can make CRUD operation in your data based on the http method you call and you can read also your related data of children if you are the parent and your parent if you login as student",
+      #terms_of_service="https://www.google.com/policies/terms/",
+      contact=openapi.Contact(email="Abdelfattah.hamdy234@gmail.com"),
       license=openapi.License(name="BSD License"),
    ),
    public=True,

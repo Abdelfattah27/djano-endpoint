@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'student.apps.StudentConfig' , 
     'rest_framework',
-    #'django.contrib.staticfiles',  # required for serving swagger ui's css/js files
     'drf_yasg'
 ]
 
@@ -47,8 +46,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-    ),
-    'PAGE_SIZE': 10
+    )
 }
 
 MIDDLEWARE = [
@@ -92,6 +90,16 @@ DATABASES = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
+}
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'api_key': 'yourKeyGoesHere'
+        
+    },
+}
+
+REDOC_SETTINGS = {
+   'LAZY_RENDERING': False,
 }
 
 
